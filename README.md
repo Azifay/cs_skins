@@ -2,10 +2,11 @@
 
 REST API площадки покупки/открытия кейсов со скинами CS2 на **Express + MongoDB + Mongoose**.
 
-> Статус: этап подготовки данных. Регистрация, авторизация, пользователи, скины и кейсы
-> реализованы. **Открытие кейсов и продажа скинов пока не реализованы** — маршруты
-> `POST /api/cases/:id/open` и `POST /api/inventory/:id/sell` возвращают `501`,
-> бизнес-логика появится на следующем этапе.
+> Статус: рабочая версия. Регистрация, авторизация, телефон, кошелёк (баланс,
+> пополнение и история), открытие кейсов со случайным скином и продажа скинов
+> реализованы и покрыты e2e-проверками. Есть SPA-страницы: витрина, кейсы
+> с анимацией открытия, личный кабинет и админ-замена картинок. Данные
+> сидируются скриптом `scripts/seed.js`.
 
 ## Стек
 
@@ -145,8 +146,12 @@ Case 1 ──* CaseItem { skin: → Skin, probability: 0..100, сумма = 100 
 | DELETE | `/api/cases/:id`           | админ  | Удаление кейса                   |
 | GET    | `/api/inventory`           | авторизация | Инвентарь текущего пользователя |
 | GET    | `/api/wallet`              | авторизация | Баланс текущего пользователя   |
-| POST   | `/api/uploads`             | админ  | Загрузка изображения в Cloudinary |
-| DELETE | `/api/uploads/*publicId`   | админ  | Удаление изображения из Cloudinary |
+| GET    | `/api/uploads` (DELETE)    | админ  | Загрузка/удаление картинки в Cloudinary |
+| PUT    | `/api/uploads/*publicId`   | админ  | Замена картинки **на том же public_id** (без нового файла) |
+| POST   | `/api/cases/:id/open`      | авторизация | Открытие кейса: списание цены, случайный скин по вероятностям, Inventory + Transaction |
+| POST   | `/api/inventory/:id/sell`  | авторизация | Продажа своего скина за `skinPrice` (зачисление на баланс) |
+| POST   | `/api/wallet/recharge`     | авторизация | Пополнение кошелька (`{ amount }`) |
+| GET    | `/api/wallet/history`      | авторизация | История операций (recharge-history): deposit/case_open/skin_sale |
 
 Формат JWT-авторизации: заголовок `Authorization: Bearer <token>`.
 
@@ -288,6 +293,38 @@ Case 1 ──* CaseItem { skin: → Skin, probability: 0..100, сумма = 100 
   "balance": 1000
 }
 ```
+
+## Deploy to Render.com
+
+Blueprint: **`render.yaml`** (runtime `node`, plan `free`, build `npm ci --omit=dev`,
+start `npm start`, health check `/healthz`).
+
+1. **Push to GitHub** — remote allaqachon bor: `git push origin <branch>`.
+2. **Render Dashboard → New → Blueprint** → repo'ni tanlang — Render `render.yaml`ni
+   o'zi o'qiydi.
+3. So'ralgan 3 ta sirli o'zgaruvchini kiriting:
+
+   | O'zgaruvchi     | Qanday qiymat                                      |
+   |-----------------|----------------------------------------------------|
+   | `MONGODB_URI`   | Atlas SRV URI (oxirida `/cs2_skin_store` bilan)     |
+   | `JWT_SECRET`    | tasodifiy uzun satr (lokal `.env`dagi bilan bir xil bo'lishi shart emas) |
+   | `CLOUDINARY_URL`| `cloudinary://API_KEY:API_SECRET@CLOUD_NAME`        |
+
+   `NODE_VERSION=20` oldindan belgilangan.
+4. **Regionni** yaratingda tanlang (mas. `frankfurt`) — yaratgandan keyin
+   o'zgartirib bo'lmaydi.
+5. **Deploy** — tekshiruv: `GET /healthz` → `200`, sayt `https://<xizmat-nomi>.onrender.com`.
+
+**Muhim eslatmalar:**
+
+- `PORT` ni kiritmang — Render o'zi inject qiladi, `src/server.js`
+  `process.env.PORT` ni o'qiydi (lokal `.env` bilan mos ishlaydi).
+- `.env` gitignore'da; Render'da dashboard env-lari ishlatiladi (dotenv u yerda no-op).
+- Ma'lumotlar: umumiy Atlas DB allaqachon `node scripts/seed.js` bilan
+  seed qilingan (idempotent). Yangi bo'sh DB uchun shu buyruqni bir marta ishga tushiring.
+- Free plan: dam olishda service uxladi — bo'sh qolgan keyin birinchi so'rov
+  ~30–60 soniya kechikadi (cold start).
+- Har bir push avtomatik redeploy qiladi (`autoDeployTrigger: commit`).
 
 ## Postman
 

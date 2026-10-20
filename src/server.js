@@ -14,6 +14,11 @@ const app = express();
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
+// Render.com health check — render.yaml healthCheckPath shu yerga qaraydi
+app.get('/healthz', (req, res) => {
+  res.status(200).send('ok');
+});
+
 app.use('/api/skins', skinsRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/cases', casesRoutes);

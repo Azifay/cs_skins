@@ -1,0 +1,30 @@
+# Render.com Blueprint — CS2 Skin Store (Express + MongoDB Atlas)
+# Dokumentatsiya: https://render.com/docs/blueprint-spec
+#
+# Deploy qilish:
+#   1. Repo'ni GitHub'ga push qiling (origin: https://github.com/Azifay/cs_skins.git)
+#   2. Render Dashboard -> New -> Blueprint -> shu repo'ni tanlang
+#   3. render.yaml'dagi `sync: false` o'zgaruvchilar so'raladi (pastdagi 3 ta)
+#   4. Regionni yaratingda tanlang (mas. frankfurt) — yaratgandan keyin O'ZGARTIRIB BO'LMAYDI
+#
+# ESLATMA: PORT ni kiritmang — Render o'zi inject qiladi va ilova shuni ishlatadi.
+services:
+  - type: web
+    name: cs2-skin-store
+    runtime: node
+    plan: free
+    # region: frankfurt   # tanlash mumkin (default oregon); yaratgandan keyin o'zgarmaydi
+    buildCommand: npm ci --omit=dev
+    startCommand: npm start
+    healthCheckPath: /healthz
+    autoDeployTrigger: commit
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      # Pastdagilar Dashboard orqali kiritiladi (blueprint yaratishda so'raladi)
+      - key: MONGODB_URI
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: CLOUDINARY_URL
+        sync: false
