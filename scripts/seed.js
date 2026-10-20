@@ -201,14 +201,21 @@ function escapeXml(s) {
   fs.mkdirSync(SKIN_DIR, { recursive: true });
   fs.mkdirSync(CASE_DIR, { recursive: true });
 
-  // 1) Skins + SVG art
+  // 1) Skins
   const ids = {};
   for (const [weapon, skinName, rarity, price, condition, floatValue] of SKINS) {
-    const img = `/img/skins/${slug(weapon)}-${slug(skinName)}.svg`;
-    fs.writeFileSync(
-      path.join(SKIN_DIR, path.basename(img)),
-      skinSVG(weapon, skinName, rarity, condition)
-    );
+    const pngName = `${slug(weapon)}-${slug(skinName)}.png`;
+    const svgName = `${slug(weapon)}-${slug(skinName)}.svg`;
+    let img = `/img/skins/${pngName}`;
+
+    if (!fs.existsSync(path.join(SKIN_DIR, pngName))) {
+      img = `/img/skins/${svgName}`;
+      fs.writeFileSync(
+        path.join(SKIN_DIR, svgName),
+        skinSVG(weapon, skinName, rarity, condition)
+      );
+    }
+
     const doc = await Skin.findOneAndUpdate(
       { weapon, skinName },
       {
@@ -226,11 +233,18 @@ function escapeXml(s) {
     ids[key(weapon, skinName)] = doc._id;
   }
 
-  // 2) Cases + SVG art
+  // 2) Cases
   let casesCreated = 0;
   for (const [name, price, rarity, description, items] of CASES) {
-    const img = `/img/cases/${slug(name)}.svg`;
-    fs.writeFileSync(path.join(CASE_DIR, path.basename(img)), caseSVG(name, rarity));
+    const pngName = `${slug(name)}.png`;
+    const svgName = `${slug(name)}.svg`;
+    let img = `/img/cases/${pngName}`;
+
+    if (!fs.existsSync(path.join(CASE_DIR, pngName))) {
+      img = `/img/cases/${svgName}`;
+      fs.writeFileSync(path.join(CASE_DIR, svgName), caseSVG(name, rarity));
+    }
+
     const before = await Case.findOne({ name });
     if (!before) casesCreated++;
     await Case.findOneAndUpdate(
