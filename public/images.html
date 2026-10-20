@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rasmlarni almashtirish — CS2 Skin Store</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/style.css" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: var(--font); min-height: 100vh; }
+    header { background: #16213e; padding: 20px; text-align: center; border-bottom: 2px solid #e94560; }
+    header h1 { color: #e94560; }
+    header a { color: #4ecca3; font-size: 14px; text-decoration: none; }
+    .panel { max-width: 1100px; margin: 20px auto; padding: 0 20px; }
+    .login-box { background: #16213e; border: 1px solid #0f3460; border-radius: 10px; padding: 20px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+    .login-box input { padding: 10px; border-radius: 6px; border: none; background: #0f3460; color: #eee; font-size: 14px; flex: 1; min-width: 180px; }
+    button { padding: 10px 20px; border-radius: 6px; border: none; background: #e94560; color: #fff; font-size: 14px; cursor: pointer; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .user-info { display: flex; gap: 10px; align-items: center; font-size: 14px; color: #4ecca3; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; margin-top: 20px; }
+    .card { background: #16213e; border-radius: 10px; padding: 16px; border: 1px solid #0f3460; }
+    .card h3 { color: #e94560; margin-bottom: 8px; font-size: 16px; }
+    .thumb { width: 100%; height: 150px; object-fit: contain; background: #0f3460; border-radius: 8px; margin-bottom: 10px; }
+    .thumb.placeholder { display: flex; align-items: center; justify-content: center; color: #aaa; font-size: 13px; }
+    .meta { font-size: 13px; color: #aaa; margin: 4px 0; word-break: break-all; }
+    .file-row { margin: 10px 0; }
+    .file-row input[type=file] { width: 100%; color: #ccc; font-size: 13px; }
+    .status { text-align: center; padding: 16px; color: #aaa; }
+    .error { color: #e94560; }
+    .ok { color: #4ecca3; }
+    .hint { font-size: 12px; color: #888; margin-top: 6px; }
+    .preview { max-height: 120px; max-width: 100%; border-radius: 6px; display: none; margin-top: 8px; }
+    /* style.css bilan moslashuv */
+    .panel { max-width: 1100px; margin: 20px auto; padding: 0 20px; }
+    .login-box { background: linear-gradient(180deg, var(--panel-2), var(--panel)); border-color: var(--line); }
+    .card img.thumb { width: 100%; height: 150px; object-fit: contain; background: rgba(0,0,0,0.25); border-radius: 8px; margin-bottom: 10px; }
+    .card .meta { color: var(--muted); font-size: 13px; word-break: break-all; }
+    .file-row input[type=file] { color: var(--muted); }
+  </style>
+</head>
+<body>
+  <nav class="nav">
+    <a class="logo" href="/"><span>🔫</span>CS2 Skin Store</a>
+    <div class="links">
+      <a href="/">🏪 Do'k</a>
+      <a href="/cases.html">📦 Kase'lar</a>
+      <a href="/account.html">👤 Hisobim</a>
+      <a href="/images.html" class="active">🖼 Rasm boshqaruvi</a>
+    </div>
+  </nav>
+
+  <div class="panel">
+    <div id="loginBox" class="login-box">
+      <input id="email" type="email" placeholder="Admin email" />
+      <input id="password" type="password" placeholder="Parol" />
+      <button id="loginBtn">Kirish</button>
+    </div>
+
+    <div id="userBox" class="login-box" style="display:none;">
+      <div class="user-info"><span id="userName"></span> <span id="userRole"></span></div>
+      <div style="flex:1"></div>
+      <button id="logoutBtn" style="background:#0f3460;">Chiqish</button>
+    </div>
+
+    <div id="status" class="status">Kirish shart: faqat admin rasmni almashtira oladi.</div>
+    <div id="grid" class="grid"></div>
+  </div>
+
+  <script>
+    const API = '/api/skins';
+    const UPLOADS = '/api/uploads';
+    // Barcha sahifalarda bitta token kaliti (account/cases bilan bir xil)
+    const TOKEN_KEY = 'cs2_token';
+    // Serverdagi filtr bilan bir xil: faqat rasm, maks 5 MB
+    const IMAGE_RE = /^image\/(jpe?g|png|webp|gif|bmp)$/i;
+    const MAX_SIZE = 5 * 1024 * 1024;
+
+    const grid = document.getElementById('grid');
+    const status = document.getElementById('status');
+    let token = localStorage.getItem(TOKEN_KEY) || '';
+    let skins = [];
+
+    const setStatus = (text, cls) => {
+      status.textContent = text;
+      status.className = 'status' + (cls ? ' ' + cls : '');
+    };
+
+    // Cloudinary URL dan public_id ajratib olamiz:
+    // https://res.cloudinary.com/<cloud>/image/upload/v123/cs2-skin-store/abc -> cs2-skin-store/abc
+    function publicIdFromUrl(url) {
+      if (!url) return null;
+      try {
+        const u = new URL(url);
+        if (!u.hostname.endsWith('cloudinary.com')) return null;
+        const parts = u.pathname.split('/').filter(Boolean);
+        const i = parts.indexOf('upload');
+        if (i === -1) return null;
+        let rest = parts.slice(i + 1);
+        if (rest.length && /^v\d+$/.test(rest[0])) rest = rest.slice(1);
+        if (!rest.length) return null;
+        const last = rest[rest.length - 1];
+        rest[rest.length - 1] = last.replace(/\.(jpe?g|png|webp|gif|bmp)$/i, '');
+        return rest.join('/');
+      } catch (e) {
+        return null;
+      }
+    }
+
+    function encodePath(p) {
+      return p.split('/').map(encodeURIComponent).join('/');
+    }
+
+    function thumbHtml(s) {
+      if (s.image) return `<img class="thumb" src="${s.image}" alt="${s.skinName}" />`;
+      return `<div class="thumb placeholder">Rasm yo'q</div>`;
+    }
+
+    function render() {
+      if (!skins.length) {
+        grid.innerHTML = '';
+        return;
+      }
+      grid.innerHTML = skins.map(s => `
+        <div class="card" data-id="${s._id}">
+          <h3>${s.weapon} | ${s.skinName}</h3>
+          ${thumbHtml(s)}
+          <div class="meta">Public ID: ${publicIdFromUrl(s.image) || '(yangi fayl yaratiladi)'}</div>
+          <div class="file-row">
+            <input type="file" class="file-input" accept="image/jpeg,image/png,image/webp,image/gif,image/bmp" />
+            <div class="hint">Faqat rasm: jpeg, png, webp, gif, bmp — maks 5 MB</div>
+            <img class="preview" />
+          </div>
+          <button class="replace-btn">Rasmni almashtirish</button>
+        </div>
+      `).join('');
+    }
+
+    async function loadSkins() {
+      setStatus('Yuklanmoqda...');
+      try {
+        const res = await fetch(API);
+        if (!res.ok) throw new Error('API error: ' + res.status);
+        skins = await res.json();
+        setStatus(skins.length + ' ta skin — rasmni tanlab almashtiring');
+        render();
+      } catch (err) {
+        setStatus('Xatolik: ' + err.message, 'error');
+      }
+    }
+
+    async function login() {
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+      if (!email || !password) return setStatus('Email va parolni kiriting', 'error');
+      try {
+        const res = await fetch('/api/users/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'API error: ' + res.status);
+        if (data.user.role !== 'admin') throw new Error('Bu hisobda admin huquqi yo\'q');
+        token = data.token;
+        localStorage.setItem(TOKEN_KEY, token);
+        showUser(data.user);
+        loadSkins();
+      } catch (err) {
+        setStatus('Xatolik: ' + err.message, 'error');
+      }
+    }
+
+    function showUser(user) {
+      document.getElementById('loginBox').style.display = 'none';
+      document.getElementById('userBox').style.display = 'flex';
+      document.getElementById('userName').textContent = user.username;
+      document.getElementById('userRole').textContent = '[' + user.role + ']';
+    }
+
+    function logout() {
+      token = '';
+      localStorage.removeItem(TOKEN_KEY);
+      document.getElementById('loginBox').style.display = 'flex';
+      document.getElementById('userBox').style.display = 'none';
+      grid.innerHTML = '';
+      setStatus('Kirish shart: faqat admin rasmni almashtira oladi.');
+    }
+
+    async function replaceSkinImage(skin, file, card) {
+      if (!IMAGE_RE.test(file.type)) {
+        throw new Error('Faqat rasm fayli qabul qilinadi (jpeg, png, webp, gif, bmp)');
+      }
+      if (file.size > MAX_SIZE) {
+        throw new Error('Fayl 5 MB dan katta bo\'lmasligi kerak');
+      }
+
+      const fd = new FormData();
+      fd.append('image', file);
+
+      // Eski rasm bor bo'la — o'sha public_id joyida UNDATED (yangi fayl yaratilmaydi)
+      const pid = publicIdFromUrl(skin.image);
+      const url = pid ? `${UPLOADS}/${encodePath(pid)}` : UPLOADS;
+      const method = pid ? 'PUT' : 'POST';
+
+      const upRes = await fetch(url, { method, headers: { Authorization: 'Bearer ' + token }, body: fd });
+      const upData = await upRes.json().catch(() => ({}));
+      if (upRes.status === 401 || upRes.status === 403) {
+        logout();
+        throw new Error('Sessiya tugadi — qaytadan kiring');
+      }
+      if (!upRes.ok) throw new Error(upData.message || 'Upload error: ' + upRes.status);
+
+      // Skin'ning image maydonini yangilaymiz (PUT /api/skins/:id)
+      const saveRes = await fetch(`${API}/${skin._id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+        body: JSON.stringify({ image: upData.url }),
+      });
+      const saveData = await saveRes.json();
+      if (!saveRes.ok) throw new Error(saveData.message || 'Save error: ' + saveRes.status);
+
+      skin.image = saveData.image;
+      const thumb = card.querySelector('.thumb');
+      if (thumb.tagName === 'IMG') {
+        thumb.src = skin.image;
+      } else {
+        thumb.outerHTML = `<img class="thumb" src="${skin.image}" alt="" />`;
+      }
+      card.querySelector('.meta').textContent = 'Public ID: ' + (publicIdFromUrl(skin.image) || '(yangi fayl yaratildi)');
+      card.querySelector('.file-input').value = '';
+      card.querySelector('.preview').style.display = 'none';
+      return upData;
+    }
+
+    // --- Events ---
+    document.getElementById('loginBtn').addEventListener('click', login);
+    document.getElementById('password').addEventListener('keydown', (e) => { if (e.key === 'Enter') login(); });
+    document.getElementById('logoutBtn').addEventListener('click', logout);
+
+    grid.addEventListener('change', (e) => {
+      if (!e.target.classList.contains('file-input')) return;
+      const card = e.target.closest('.card');
+      const preview = card.querySelector('.preview');
+      const file = e.target.files[0];
+      if (!file) { preview.style.display = 'none'; return; }
+      preview.src = URL.createObjectURL(file);
+      preview.style.display = 'block';
+    });
+
+    grid.addEventListener('click', async (e) => {
+      if (!e.target.classList.contains('replace-btn')) return;
+      const card = e.target.closest('.card');
+      const skin = skins.find(s => s._id === card.dataset.id);
+      const input = card.querySelector('.file-input');
+      const file = input.files[0];
+
+      if (!skin) return;
+      if (!file) return setStatus('Avval yangi rasm faylini tanlang', 'error');
+
+      e.target.disabled = true;
+      try {
+        const data = await replaceSkinImage(skin, file, card);
+        setStatus(
+          (publicIdFromUrl(data.url) || '') + ' — joyida almashtirildi (yangi fayl yaratilmadi) ✔',
+          'ok'
+        );
+      } catch (err) {
+        setStatus('Xatolik: ' + err.message, 'error');
+      } finally {
+        e.target.disabled = false;
+      }
+    });
+
+    // JWT payload'ni client tomonida o'qib, adminligini tekshiramiz
+    function decodeToken(t) {
+      try {
+        const payload = t.split('.')[1];
+        return JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/')));
+      } catch (e) {
+        return null;
+      }
+    }
+
+    async function restoreSession() {
+      if (!token) return;
+      const payload = decodeToken(token);
+      if (!payload || !payload.id || payload.role !== 'admin') { logout(); return; }
+      try {
+        const r = await fetch('/api/users/' + payload.id, { headers: { Authorization: 'Bearer ' + token } });
+        if (!r.ok) { logout(); return; }
+        const user = await r.json();
+        showUser(user);
+        loadSkins();
+      } catch (e) {
+        logout();
+      }
+    }
+
+    restoreSession();
+  </script>
+</body>
+</html>

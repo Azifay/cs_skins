@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CS2 Skin Store</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <nav class="nav">
+    <a class="logo" href="/"><span>🔫</span>CS2 Skin Store</a>
+    <div class="links">
+      <a href="/" class="active">🏪 Do'k</a>
+      <a href="/cases.html">📦 Kase'lar</a>
+      <a href="/account.html">👤 Hisobim</a>
+      <a href="/images.html">🖼 Rasm boshqaruvi</a>
+    </div>
+  </nav>
+
+  <header class="hero fade-up">
+    <h1>Eng zo'r <span class="grad">skinlar</span><br />bir joyda</h1>
+    <p>Qidiriv, rarity bo'yicha filtr va narx — hammasi bir sahifada. Kase ochib yana ko'proq yutib oling!</p>
+    <div class="badge-row">
+      <span class="badge">🚀 Tez yetkazib berish</span>
+      <span class="badge">💰 Hamyon to'ldirish</span>
+      <span class="badge">📦 Animatsiyali kase'lar</span>
+    </div>
+  </header>
+
+  <div class="toolbar">
+    <input id="searchInput" type="text" placeholder="Qidirish: AK-47, Howl, Dragon Lore..." />
+    <button id="searchBtn" class="btn">🔍 Qidirish</button>
+    <select id="raritySelect">
+      <option value="">Barcha rarity</option>
+      <option>Consumer</option>
+      <option>Industrial</option>
+      <option>Mil-Spec</option>
+      <option>Restricted</option>
+      <option>Classified</option>
+      <option>Covert</option>
+      <option>Contraband</option>
+    </select>
+    <button id="resetBtn" class="btn ghost">↺ Reset</button>
+  </div>
+
+  <div id="status" class="status">Yuklanmoqda...</div>
+  <div class="wrap">
+    <div id="grid" class="grid"></div>
+  </div>
+
+  <script>
+    const API = '/api/skins';
+    const grid = document.getElementById('grid');
+    const status = document.getElementById('status');
+
+    const RARITY_COLORS = {
+      Consumer: '#b0c3d9', Industrial: '#5e98d9', 'Mil-Spec': '#4b69ff',
+      Restricted: '#8847ff', Classified: '#d32ce6', Covert: '#eb4b4b',
+      Contraband: '#e4ae39',
+    };
+
+    function cardHtml(s) {
+      const rc = RARITY_COLORS[s.skinRarity] || '#4b69ff';
+      const thumb = s.image
+        ? `<img src="${s.image}" alt="${s.weapon} ${s.skinName}" loading="lazy" />`
+        : `<span class="placeholder">Rasm yo'q</span>`;
+      return `
+        <div class="card fade-up r-${s.skinRarity}" style="--rc:${rc}">
+          <div class="thumb">${thumb}</div>
+          <h3>${s.weapon} | ${s.skinName}</h3>
+          <span class="r-chip">${s.skinRarity}</span>
+          <div class="price-tag">$${Number(s.skinPrice).toFixed(2)}</div>
+          <div class="meta">Holat: ${s.condition} · Float: ${s.floatValue ?? '—'}</div>
+          <div class="desc">${s.description || ''}</div>
+        </div>`;
+    }
+
+    async function loadSkins(url) {
+      status.textContent = 'Yuklanmoqda...';
+      grid.innerHTML = '';
+      try {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error('API error: ' + res.status);
+        const skins = await res.json();
+        if (skins.length === 0) {
+          status.textContent = 'Skin topilmadi 😕';
+          return;
+        }
+        status.textContent = 'Jami ' + skins.length + ' ta skin topildi';
+        grid.innerHTML = skins.map(cardHtml).join('');
+      } catch (err) {
+        status.innerHTML = '<span class="error">Xatolik: ' + err.message + '</span>';
+      }
+    }
+
+    document.getElementById('searchBtn').addEventListener('click', () => {
+      const q = document.getElementById('searchInput').value.trim();
+      if (!q) return loadSkins(API);
+      loadSkins(API + '/search?q=' + encodeURIComponent(q));
+    });
+
+    document.getElementById('searchInput').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') document.getElementById('searchBtn').click();
+    });
+
+    document.getElementById('raritySelect').addEventListener('change', (e) => {
+      const rarity = e.target.value;
+      if (!rarity) return loadSkins(API);
+      loadSkins(API + '/filter?rarity=' + encodeURIComponent(rarity));
+    });
+
+    document.getElementById('resetBtn').addEventListener('click', () => {
+      document.getElementById('searchInput').value = '';
+      document.getElementById('raritySelect').value = '';
+      loadSkins(API);
+    });
+
+    loadSkins(API);
+  </script>
+</body>
+</html>

@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kase'lar — CS2 Skin Store</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <nav class="nav">
+    <a class="logo" href="/"><span>🔫</span>CS2 Skin Store</a>
+    <div class="links">
+      <a href="/">🏪 Do'k</a>
+      <a href="/cases.html" class="active">📦 Kase'lar</a>
+      <a href="/account.html">👤 Hisobim</a>
+      <a href="/images.html">🖼 Rasm boshqaruvi</a>
+    </div>
+  </nav>
+
+  <header class="hero fade-up">
+    <h1>Kase'larni <span class="grad">oching</span></h1>
+    <p>Har bir ochilishda tasodifiy skin tushadi — ehtimolliklar ochiq. Yutganingizga ishonch hosil qiling!</p>
+    <div class="badge-row">
+      <span class="badge"> Hamyon: <b id="balance">—</b></span>
+      <span class="badge">Uchun <a href="/account.html" style="color:#38f2b0;">hisobga kiring</a></span>
+    </div>
+  </header>
+
+  <div id="status" class="status">Yuklanmoqda...</div>
+  <div class="wrap">
+    <div id="grid" class="grid"></div>
+  </div>
+
+  <!-- Animatsiya oynasi -->
+  <div id="overlay" class="overlay">
+    <div class="modal">
+      <h2 id="modalTitle">Kase ochilmoqda...</h2>
+
+      <div class="reel-frame">
+        <div class="lights">
+          <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+          <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+          <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+        </div>
+        <div class="reel-window" id="reelWindow">
+          <div class="marker"></div>
+          <div class="reel" id="reel"></div>
+        </div>
+      </div>
+
+      <div id="winnerBox" class="winner-box">
+        <div id="winnerImgWrap"></div>
+        <h3 id="winnerName"></h3>
+        <div id="winnerRarity" class="r-chip"></div>
+        <div class="winner-price">$<span id="winnerPrice"></span></div>
+        <div class="muted" style="margin-top:6px;">Skin inventaringizga qo'shildi — Hisobim sahifasida sotishingiz mumkin.</div>
+      </div>
+
+      <div id="modalError" class="error" style="display:none;margin-top:12px;"></div>
+
+      <div class="modal-actions">
+        <button id="againBtn" class="btn mint" style="display:none;">🔁 Yana ochish</button>
+        <button id="closeBtn" class="btn ghost">Yopish</button>
+      </div>
+    </div>
+  </div>
+
+  <canvas id="confetti-canvas"></canvas>
+
+  <script>
+    const API = '/api';
+    const TOKEN_KEY = 'cs2_token';
+    let token = localStorage.getItem(TOKEN_KEY) || '';
+    let cases = [];
+    let opening = false;
+
+    const RARITY_COLORS = {
+      Consumer: '#b0c3d9', Industrial: '#5e98d9', 'Mil-Spec': '#4b69ff',
+      Restricted: '#8847ff', Classified: '#d32ce6', Covert: '#eb4b4b',
+      Contraband: '#e4ae39',
+    };
+
+    const $ = (id) => document.getElementById(id);
+    const grid = $('grid');
+    const status = $('status');
+
+    const setStatus = (text, cls) => {
+      status.textContent = text;
+      status.className = 'status' + (cls ? ' ' + cls : '');
+    };
+
+    function authHeaders(extra) {
+      const h = Object.assign({}, extra || {});
+      if (token) h.Authorization = 'Bearer ' + token;
+      return h;
+    }
+
+    async function loadBalance() {
+      if (!token) { $('balance').textContent = '—'; return; }
+      try {
+        const res = await fetch(API + '/wallet', { headers: authHeaders() });
+        if (res.status === 401) { token = ''; localStorage.removeItem(TOKEN_KEY); $('balance').textContent = '—'; return; }
+        const data = await res.json();
+        if (res.ok) $('balance').textContent = Number(data.balance).toFixed(2);
+      } catch (e) { /* ignore */ }
+    }
+
+    function cellHtml(skin) {
+      if (skin && skin.image) return `<img src="${skin.image}" alt="" />`;
+      return `<div class="noimg">🎯</div>`;
+    }
+
+    function render() {
+      if (!cases.length) {
+        grid.innerHTML = '';
+        setStatus("Hozircha kase yo'q — admin kase yaratsin (POST /api/cases).", '');
+        return;
+      }
+      setStatus(cases.length + ' ta kase — ochishga tayyor!', '');
+      grid.innerHTML = cases.map((c) => {
+        const rarity = c.rarity || 'Mil-Spec';
+        const rc = RARITY_COLORS[rarity] || '#4b69ff';
+        const items = (c.items || []).map((i) => i.skin).filter(Boolean);
+        const strip = items.slice(0, 6).map((s) => cellHtml(s)).join('') ||
+          '<div class="noimg" style="width:62px;height:46px;">?</div>';
+        const chances = items.slice(0, 4).map((s) => {
+          const it = c.items.find((x) => (x.skin && x.skin._id) === s._id);
+          return `<div class="meta">${s.weapon} | ${s.skinName} — <b style="color:${rc}">${it ? it.probability : '?'}%</b></div>`;
+        }).join('');
+        const img = c.image
+          ? `<img src="${c.image}" alt="" style="width:100%;height:130px;object-fit:contain;" />`
+          : `<div class="thumb"><span class="placeholder">📦</span></div>`;
+        return `
+        <div class="card fade-up r-${rarity}" style="--rc:${rc}" data-id="${c._id}">
+          ${c.image ? `<div class="thumb">${img}</div>` : img}
+          <h3>${c.name}</h3>
+          <span class="r-chip">${rarity}</span>
+          <div class="price-tag">$${Number(c.price).toFixed(2)}</div>
+          <div class="meta">${items.length} ta skin ichida</div>
+          <div style="max-height:112px;overflow:hidden;margin:6px 0;">${chances}</div>
+          <button class="btn block open-btn">📦 Ochish</button>
+        </div>`;
+      }).join('');
+    }
+
+    async function loadCases() {
+      setStatus('Yuklanmoqda...');
+      try {
+        const res = await fetch(API + '/cases');
+        if (!res.ok) throw new Error('API error: ' + res.status);
+        cases = await res.json();
+        render();
+      } catch (err) {
+        setStatus('Xatolik: ' + err.message, 'error');
+      }
+    }
+
+    // ---------- Confetti ----------
+    function fireConfetti(color) {
+      const canvas = $('confetti-canvas');
+      const ctx = canvas.getContext('2d');
+      canvas.width = innerWidth;
+      canvas.height = innerHeight;
+      const colors = [color, '#ffc857', '#38f2b0', '#ff4655', '#4b69ff', '#fff'];
+      const parts = [];
+      for (let i = 0; i < 140; i++) {
+        parts.push({
+          x: innerWidth / 2 + (Math.random() - 0.5) * 160,
+          y: innerHeight * 0.42,
+          vx: (Math.random() - 0.5) * 13,
+          vy: -Math.random() * 13 - 4,
+          s: 5 + Math.random() * 7,
+          c: colors[(Math.random() * colors.length) | 0],
+          r: Math.random() * Math.PI,
+          vr: (Math.random() - 0.5) * 0.35,
+        });
+      }
+      let frames = 0;
+      (function tick() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        frames++;
+        parts.forEach((p) => {
+          p.vy += 0.35;
+          p.x += p.vx;
+          p.y += p.vy;
+          p.r += p.vr;
+          ctx.save();
+          ctx.translate(p.x, p.y);
+          ctx.rotate(p.r);
+          ctx.fillStyle = p.c;
+          ctx.fillRect(-p.s / 2, -p.s / 2, p.s, p.s * 0.6);
+          ctx.restore();
+        });
+        if (frames < 220) requestAnimationFrame(tick);
+        else ctx.clearRect(0, 0, canvas.width, canvas.height);
+      })();
+    }
+
+    // ---------- Animatsiya ----------
+    const CELL = 150, GAP = 14, STEP = CELL + GAP, WIN_INDEX = 55;
+
+    function buildReel(c, winnerSkin) {
+      const items = (c.items || []).map((i) => i.skin).filter(Boolean);
+      const source = items.length ? items : [winnerSkin].filter(Boolean);
+      const cells = [];
+      for (let i = 0; i < 70; i++) {
+        const s = i === WIN_INDEX ? winnerSkin : source[(Math.random() * source.length) | 0];
+        cells.push(`<div class="cell">${cellHtml(s)}</div>`);
+      }
+      $('reel').innerHTML = cells.join('');
+      return $('reel');
+    }
+
+    function playAnimation(c, winnerSkin, onDone) {
+      const reel = buildReel(c, winnerSkin);
+      const win = $('reelWindow');
+      const offset = win.clientWidth / 2 - CELL / 2;
+      const target = -(WIN_INDEX * STEP) + offset;
+
+      reel.style.transition = 'none';
+      reel.style.transform = 'translateX(' + (-STEP * 3) + 'px)';
+
+      let finished = false;
+      const finish = () => { if (finished) return; finished = true; onDone(); };
+
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          reel.style.transition = 'transform 5s cubic-bezier(0.12, 0.75, 0.16, 1)';
+          reel.style.transform = 'translateX(' + target + 'px)';
+        });
+      });
+      setTimeout(finish, 5300);
+      reel.addEventListener('transitionend', finish, { once: true });
+    }
+
+    function showWinner(skin) {
+      const rarity = (skin && skin.skinRarity) || '';
+      const rc = RARITY_COLORS[rarity] || '#4b69ff';
+      $('winnerImgWrap').innerHTML = skin && skin.image
+        ? `<div class="winner-glow" style="--wc:${rc}"><img src="${skin.image}" alt="" /></div>`
+        : `<div class="winner-glow" style="--wc:${rc}">🎁</div>`;
+      $('winnerName').textContent = skin ? (skin.weapon + ' | ' + skin.skinName) : 'Skin';
+      const badge = $('winnerRarity');
+      badge.textContent = rarity || 'Skin';
+      badge.style.setProperty('--rc', rc);
+      $('winnerPrice').textContent = skin ? Number(skin.skinPrice || 0).toFixed(2) : '0.00';
+      $('winnerBox').classList.add('show');
+      $('modalTitle').textContent = '🎉 Tabriklaymiz!';
+      fireConfetti(rc);
+    }
+
+    async function openCase(c, card) {
+      if (opening) return;
+      if (!token) {
+        setStatus('Kase ochish uchun hisobga kiring!', 'error');
+        window.location.href = '/account.html';
+        return;
+      }
+      opening = true;
+      const btn = card.querySelector('.open-btn');
+      if (btn) btn.disabled = true;
+
+      try {
+        const res = await fetch(API + '/cases/' + c._id + '/open', {
+          method: 'POST',
+          headers: authHeaders(),
+        });
+        const data = await res.json().catch(() => ({}));
+
+        if (res.status === 401) {
+          token = ''; localStorage.removeItem(TOKEN_KEY);
+          setStatus('Sessiya tugadi — hisobga kiring', 'error');
+          window.location.href = '/account.html';
+          return;
+        }
+        if (!res.ok) {
+          setStatus('Xatolik: ' + (data.message || ('API error: ' + res.status)), 'error');
+          if (data.message && /balance/i.test(data.message)) window.location.href = '/account.html';
+          return;
+        }
+
+        $('balance').textContent = Number(data.balance).toFixed(2);
+        $('winnerBox').classList.remove('show');
+        $('modalError').style.display = 'none';
+        $('againBtn').style.display = 'none';
+        $('modalTitle').textContent = 'Kase ochilmoqda...';
+        $('overlay').classList.add('show');
+
+        playAnimation(c, data.skin, () => {
+          showWinner(data.skin);
+          $('againBtn').style.display = 'inline-block';
+        });
+      } finally {
+        opening = false;
+        if (btn) btn.disabled = false;
+      }
+    }
+
+    function closeModal() { $('overlay').classList.remove('show'); }
+
+    // ---------- Events ----------
+    grid.addEventListener('click', (e) => {
+      if (!e.target.classList.contains('open-btn')) return;
+      const card = e.target.closest('.card');
+      const c = cases.find((x) => x._id === card.dataset.id);
+      if (c) openCase(c, card);
+    });
+
+    $('closeBtn').addEventListener('click', closeModal);
+    $('againBtn').addEventListener('click', () => {
+      closeModal();
+      setStatus('Yana ochish uchun kase tanlang', '');
+    });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
+
+    loadBalance();
+    loadCases();
+  </script>
+</body>
+</html>

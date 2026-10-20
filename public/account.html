@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mening hisobim — CS2 Skin Store</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <nav class="nav">
+    <a class="logo" href="/"><span>🔫</span>CS2 Skin Store</a>
+    <div class="links">
+      <a href="/">🏪 Do'k</a>
+      <a href="/cases.html">📦 Kase'lar</a>
+      <a href="/account.html" class="active">👤 Hisobim</a>
+      <a href="/images.html">🖼 Rasm boshqaruvi</a>
+    </div>
+  </nav>
+
+  <!-- Kirish / ro'yxatdan o'tish -->
+  <div id="authPanel" class="panel" style="display:none;">
+    <header class="hero fade-up" style="padding-bottom:10px;">
+      <h1>Xush kelibsiz <span class="grad">👇</span></h1>
+      <p>Hisobga kiring yoki yangi hisob oching — kase ochish, hamyon va skinlar uchun.</p>
+    </header>
+
+    <div class="box fade-up">
+      <h2>🔑 Kirish</h2>
+      <div class="row">
+        <input id="loginEmail" type="email" placeholder="Email" />
+        <input id="loginPassword" type="password" placeholder="Parol" />
+        <button id="loginBtn" class="btn mint">Kirish</button>
+      </div>
+    </div>
+
+    <div class="box fade-up">
+      <h2>📝 Ro'yxatdan o'tish</h2>
+      <div class="row">
+        <input id="regName" type="text" placeholder="Ism (username)" />
+        <input id="regEmail" type="email" placeholder="Email" />
+        <input id="regPhone" type="tel" placeholder="Telefon (+998...)" />
+        <input id="regPassword" type="password" placeholder="Parol (kamida 6)" />
+        <button id="regBtn" class="btn">Ro'yxatdan o'tish</button>
+      </div>
+      <div class="muted" style="margin-top:8px;">Telefon ixtiyoriy — faqat raqamlar, +, (, ), -, bo'shliq.</div>
+    </div>
+
+    <div id="authStatus" class="status"></div>
+  </div>
+
+  <!-- Hisob -->
+  <div id="profilePanel" class="panel" style="display:none;">
+    <div class="box fade-up">
+      <div class="row spread">
+        <h2 style="margin:0;">👤 Profil</h2>
+        <button id="logoutBtn" class="btn ghost small">Chiqish</button>
+      </div>
+      <div class="stat-grid" style="margin-top:14px;">
+        <div class="stat"><div class="label">Ism</div><div class="value" id="pName" style="font-size:19px;">—</div></div>
+        <div class="stat"><div class="label">Email</div><div class="value" id="pEmail" style="font-size:19px;">—</div></div>
+        <div class="stat"><div class="label">Telefon</div><div class="value" id="pPhone" style="font-size:19px;">—</div></div>
+        <div class="stat"><div class="label">Rol</div><div class="value gold" id="pRole" style="font-size:19px;">—</div></div>
+      </div>
+    </div>
+
+    <div class="box balance-hero fade-up">
+      <div class="row spread">
+        <div>
+          <div class="label muted" style="text-transform:uppercase;letter-spacing:1.6px;font-size:12.5px;">Hamyon balansi</div>
+          <div class="value mint" style="font-family:var(--font-display);font-size:38px;font-weight:800;">$<span id="balance">0</span></div>
+        </div>
+        <div class="row" style="flex:1;min-width:260px;max-width:420px;">
+          <input id="rechargeAmount" type="number" min="1" step="1" placeholder="Summa ($)" style="flex:1;padding:12px 14px;border-radius:10px;border:1px solid var(--line);background:rgba(0,0,0,0.25);color:var(--text);font-size:16px;" />
+          <button id="rechargeBtn" class="btn mint">💳 To'ldirish</button>
+        </div>
+      </div>
+      <div class="muted" style="margin-top:8px;">Hamyon: kase ochish va skin sotib olish/sotish uchun ishlatiladi.</div>
+
+      <h2 style="margin-top:20px;">🧾 To'ldirish tarixi</h2>
+      <table>
+        <thead>
+          <tr><th>Sana</th><th>Turi</th><th>Summa</th><th>Balans</th></tr>
+        </thead>
+        <tbody id="historyBody">
+          <tr><td colspan="4" class="muted">Hozircha yozuv yo'q</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="box fade-up">
+      <div class="row spread">
+        <h2 style="margin:0;">🎒 Mening skinlarim</h2>
+        <div class="tabs">
+          <button id="tabOwned" class="active">Sotilmagan</button>
+          <button id="tabAll">Barchasi</button>
+        </div>
+      </div>
+      <div id="invGrid" class="grid" style="margin-top:14px;"></div>
+      <div id="invEmpty" class="muted" style="display:none;margin-top:12px;">Skin yo'q — <a href="/cases.html" style="color:#38f2b0;">kase ochib</a> ko'ring!</div>
+    </div>
+
+    <div id="profileStatus" class="status"></div>
+  </div>
+
+  <script>
+    const API = '/api';
+    const TOKEN_KEY = 'cs2_token';
+    let token = localStorage.getItem(TOKEN_KEY) || '';
+    let currentUser = null;
+    let inventoryFilter = 'owned';
+
+    const $ = (id) => document.getElementById(id);
+    const setStatus = (el, text, cls) => {
+      el.textContent = text;
+      el.className = 'status' + (cls ? ' ' + cls : '');
+    };
+
+    const RARITY_COLORS = {
+      Consumer: '#b0c3d9', Industrial: '#5e98d9', 'Mil-Spec': '#4b69ff',
+      Restricted: '#8847ff', Classified: '#d32ce6', Covert: '#eb4b4b',
+      Contraband: '#e4ae39',
+    };
+
+    const TYPE_LABEL = {
+      deposit: "To'ldirish",
+      case_open: 'Kase ochildi',
+      skin_sale: 'Skin sotildi',
+    };
+
+    async function api(url, opts = {}) {
+      const headers = Object.assign({}, opts.headers || {});
+      if (token) headers.Authorization = 'Bearer ' + token;
+      if (opts.body && typeof opts.body !== 'string' && !(opts.body instanceof FormData)) {
+        headers['Content-Type'] = 'application/json';
+        opts.body = JSON.stringify(opts.body);
+      }
+      const res = await fetch(API + url, Object.assign({}, opts, { headers }));
+      let data = {};
+      try { data = await res.json(); } catch (e) {}
+      return { ok: res.ok, status: res.status, data };
+    }
+
+    function decodeToken(t) {
+      try {
+        return JSON.parse(atob(t.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+      } catch (e) { return null; }
+    }
+
+    function showAuth() {
+      $('authPanel').style.display = 'grid';
+      $('profilePanel').style.display = 'none';
+    }
+
+    function showProfile() {
+      $('authPanel').style.display = 'none';
+      $('profilePanel').style.display = 'grid';
+    }
+
+    function renderProfile(user) {
+      $('pName').textContent = user.username || '—';
+      $('pEmail').textContent = user.email || '—';
+      $('pPhone').textContent = user.phone || '—';
+      $('pRole').textContent = user.role === 'admin' ? 'admin 👑' : 'user';
+      $('balance').textContent = Number(user.balance || 0).toFixed(2);
+    }
+
+    async function loadAll() {
+      const payload = decodeToken(token);
+      if (!payload || !payload.id) { logout(); return; }
+
+      const me = await api('/users/' + payload.id);
+      if (!me.ok) { logout(); return; }
+      currentUser = me.data;
+      renderProfile(currentUser);
+      showProfile();
+      loadHistory();
+      loadInventory();
+    }
+
+    async function loadHistory() {
+      const r = await api('/wallet/history');
+      const body = $('historyBody');
+      if (!r.ok || !r.data.transactions || !r.data.transactions.length) {
+        body.innerHTML = '<tr><td colspan="4" class="muted">Hozircha yozuv yo\'q</td></tr>';
+        return;
+      }
+      body.innerHTML = r.data.transactions.map((t) => {
+        const date = new Date(t.createdAt).toLocaleString('uz-UZ');
+        const sign = (t.type === 'case_open') ? '-' : '+';
+        const bal = Number(t.balanceBefore).toFixed(2) + ' → ' + Number(t.balanceAfter).toFixed(2);
+        return `<tr>
+          <td>${date}</td>
+          <td class="type-${t.type}">${TYPE_LABEL[t.type] || t.type}</td>
+          <td>${sign}$${Number(t.amount).toFixed(2)}</td>
+          <td>${bal}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    async function loadInventory() {
+      const r = await api('/inventory' + (inventoryFilter === 'owned' ? '?status=owned' : ''));
+      const grid = $('invGrid');
+      const empty = $('invEmpty');
+      if (!r.ok || !r.data.items || !r.data.items.length) {
+        grid.innerHTML = '';
+        empty.style.display = 'block';
+        return;
+      }
+      empty.style.display = 'none';
+      grid.innerHTML = r.data.items.map((item) => {
+        const s = item.skin || {};
+        const rc = RARITY_COLORS[s.skinRarity] || '#4b69ff';
+        const img = s.image
+          ? `<img src="${s.image}" alt="" loading="lazy" />`
+          : `<span class="placeholder">Rasm yo'q</span>`;
+        const sold = item.status === 'sold';
+        return `<div class="card r-${s.skinRarity || 'Mil-Spec'}" style="--rc:${rc}" data-id="${item._id}">
+          <div class="thumb">${img}</div>
+          <h3>${s.weapon || ''} | ${s.skinName || '—'}</h3>
+          <span class="r-chip">${s.skinRarity || ''}</span>
+          <div class="price-tag">$${Number(s.skinPrice || 0).toFixed(2)}</div>
+          <div class="meta">${s.condition || ''} ${sold ? '· sotilgan ✕' : ''}</div>
+          ${sold ? '' : `<button class="btn mint block sell-btn" style="margin-top:10px;">💰 Sotish</button>`}
+        </div>`;
+      }).join('');
+    }
+
+    async function login() {
+      const email = $('loginEmail').value.trim();
+      const password = $('loginPassword').value;
+      if (!email || !password) return setStatus($('authStatus'), 'Email va parol kiriting', 'error');
+      const r = await api('/users/login', { method: 'POST', body: { email, password } });
+      if (!r.ok) return setStatus($('authStatus'), 'Xatolik: ' + (r.data.message || r.status), 'error');
+      token = r.data.token;
+      localStorage.setItem(TOKEN_KEY, token);
+      setStatus($('authStatus'), 'Xush kelibsiz! ✔', 'ok');
+      loadAll();
+    }
+
+    async function register() {
+      const username = $('regName').value.trim();
+      const email = $('regEmail').value.trim();
+      const phone = $('regPhone').value.trim();
+      const password = $('regPassword').value;
+      if (!username || !email || !password) {
+        return setStatus($('authStatus'), 'Ism, email va parol majburiy', 'error');
+      }
+      const body = { username, email, password };
+      if (phone) body.phone = phone;
+      const r = await api('/users/register', { method: 'POST', body });
+      if (!r.ok) return setStatus($('authStatus'), 'Xatolik: ' + (r.data.message || r.status), 'error');
+      token = r.data.token;
+      localStorage.setItem(TOKEN_KEY, token);
+      setStatus($('authStatus'), 'Ro\'yxatdan o\'tildi! ✔', 'ok');
+      loadAll();
+    }
+
+    async function recharge() {
+      const amount = Number($('rechargeAmount').value);
+      if (!amount || amount <= 0) return setStatus($('profileStatus'), 'Summani kiriting', 'error');
+      $('rechargeBtn').disabled = true;
+      try {
+        const r = await api('/wallet/recharge', { method: 'POST', body: { amount } });
+        if (!r.ok) return setStatus($('profileStatus'), 'Xatolik: ' + (r.data.message || r.status), 'error');
+        $('balance').textContent = Number(r.data.balance).toFixed(2);
+        $('rechargeAmount').value = '';
+        setStatus($('profileStatus'), `Hamyon $${amount} ga to'ldirildi ✔`, 'ok');
+        loadHistory();
+      } finally {
+        $('rechargeBtn').disabled = false;
+      }
+    }
+
+    async function sellItem(itemId) {
+      const r = await api('/inventory/' + itemId + '/sell', { method: 'POST' });
+      if (!r.ok) return setStatus($('profileStatus'), 'Xatolik: ' + (r.data.message || r.status), 'error');
+      $('balance').textContent = Number(r.data.balance).toFixed(2);
+      setStatus($('profileStatus'), `Skin sotildi: +$${Number(r.data.earned).toFixed(2)} ✔`, 'ok');
+      loadInventory();
+      loadHistory();
+    }
+
+    function logout() {
+      token = '';
+      currentUser = null;
+      localStorage.removeItem(TOKEN_KEY);
+      showAuth();
+      setStatus($('authStatus'), 'Chiqildi.', '');
+    }
+
+    // --- Events ---
+    $('loginBtn').addEventListener('click', login);
+    $('regBtn').addEventListener('click', register);
+    $('rechargeBtn').addEventListener('click', recharge);
+    $('logoutBtn').addEventListener('click', logout);
+
+    $('invGrid').addEventListener('click', (e) => {
+      if (!e.target.classList.contains('sell-btn')) return;
+      const card = e.target.closest('.card');
+      e.target.disabled = true;
+      sellItem(card.dataset.id).finally(() => { e.target.disabled = false; });
+    });
+
+    $('tabOwned').addEventListener('click', () => {
+      inventoryFilter = 'owned';
+      $('tabOwned').classList.add('active');
+      $('tabAll').classList.remove('active');
+      loadInventory();
+    });
+    $('tabAll').addEventListener('click', () => {
+      inventoryFilter = 'all';
+      $('tabAll').classList.add('active');
+      $('tabOwned').classList.remove('active');
+      loadInventory();
+    });
+
+    ['loginPassword', 'regPassword'].forEach((id) => {
+      $(id).addEventListener('keydown', (e) => { if (e.key === 'Enter') login(); });
+    });
+
+    if (token) loadAll(); else showAuth();
+  </script>
+</body>
+</html>

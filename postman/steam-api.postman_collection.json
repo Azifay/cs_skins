@@ -1,0 +1,347 @@
+{
+  "info": {
+    "_postman_id": "b7f1c2d3-0000-4000-8000-cs2skinstore01",
+    "name": "CS2 Skin Store API",
+    "description": "API площадки скинов CS2. Сначала выполните Register или Login — токен и userId сохранятся в переменные коллекции автоматически. Для админ-маршрутов сделайте пользователя админом: db.users.updateOne({ email: '...' }, { $set: { role: 'admin' } }).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:4040" },
+    { "key": "token", "value": "" },
+    { "key": "userId", "value": "" },
+    { "key": "skinId", "value": "" },
+    { "key": "caseId", "value": "" },
+    { "key": "inventoryId", "value": "" },
+    { "key": "publicId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"alice\",\n  \"email\": \"alice@test.dev\",\n  \"password\": \"secret123\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/users/register", "host": ["{{baseUrl}}"], "path": ["api", "users", "register"] },
+            "description": "Регистрация. Сохраняет token и userId в переменные коллекции."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Статус 201', () => pm.response.to.have.status(201));",
+                  "const json = pm.response.json();",
+                  "pm.collectionVariables.set('token', json.token);",
+                  "pm.collectionVariables.set('userId', json.user.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"alice@test.dev\",\n  \"password\": \"secret123\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/users/login", "host": ["{{baseUrl}}"], "path": ["api", "users", "login"] },
+            "description": "Логин. Сохраняет token и userId в переменные коллекции."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Статус 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.collectionVariables.set('token', json.token);",
+                  "pm.collectionVariables.set('userId', json.user.id);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "Get all users (admin)",
+          "request": {
+            "method": "GET",
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}" }] },
+            "url": { "raw": "{{baseUrl}}/api/users", "host": ["{{baseUrl}}"], "path": ["api", "users"] },
+            "description": "Только для role=admin. Без прав админа вернётся 403."
+          }
+        },
+        {
+          "name": "Get user by id",
+          "request": {
+            "method": "GET",
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}" }] },
+            "url": { "raw": "{{baseUrl}}/api/users/{{userId}}", "host": ["{{baseUrl}}"], "path": ["api", "users", "{{userId}}"] },
+            "description": "Свой профиль или админ."
+          }
+        },
+        {
+          "name": "Update user",
+          "request": {
+            "method": "PUT",
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}" }] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"username\": \"alice_updated\"\n}" },
+            "url": { "raw": "{{baseUrl}}/api/users/{{userId}}", "host": ["{{baseUrl}}"], "path": ["api", "users", "{{userId}}"] },
+            "description": "Обычный пользователь меняет username/email/password; role и balance — только админ."
+          }
+        },
+        {
+          "name": "Delete user (admin)",
+          "request": {
+            "method": "DELETE",
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}" }] },
+            "url": { "raw": "{{baseUrl}}/api/users/{{userId}}", "host": ["{{baseUrl}}"], "path": ["api", "users", "{{userId}}"] },
+            "description": "Только для role=admin."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Skins",
+      "item": [
+        {
+          "name": "Get all skins",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/skins", "host": ["{{baseUrl}}"], "path": ["api", "skins"] }
+          }
+        },
+        {
+          "name": "Search skins",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/skins/search?q=AK-47", "host": ["{{baseUrl}}"], "path": ["api", "skins", "search"], "query": [{ "key": "q", "value": "AK-47" }] }
+          }
+        },
+        {
+          "name": "Filter skins",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/skins/filter?rarity=Covert&minPrice=10", "host": ["{{baseUrl}}"], "path": ["api", "skins", "filter"], "query": [{ "key": "rarity", "value": "Covert" }, { "key": "minPrice", "value": "10" }] }
+          }
+        },
+        {
+          "name": "Create skin",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"skinName\": \"Asiimov\",\n  \"weapon\": \"AK-47\",\n  \"skinRarity\": \"Covert\",\n  \"skinPrice\": 250,\n  \"condition\": \"Field-Tested\",\n  \"floatValue\": 0.3,\n  \"image\": \"https://example.com/asiimov.png\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/skins", "host": ["{{baseUrl}}"], "path": ["api", "skins"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Статус 201', () => pm.response.to.have.status(201));", "pm.collectionVariables.set('skinId', pm.response.json()._id);"]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get skin by id",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/skins/{{skinId}}", "host": ["{{baseUrl}}"], "path": ["api", "skins", "{{skinId}}"] }
+          }
+        },
+        {
+          "name": "Update skin",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"skinPrice\": 300\n}" },
+            "url": { "raw": "{{baseUrl}}/api/skins/{{skinId}}", "host": ["{{baseUrl}}"], "path": ["api", "skins", "{{skinId}}"] }
+          }
+        },
+        {
+          "name": "Delete skin",
+          "request": {
+            "method": "DELETE",
+            "url": { "raw": "{{baseUrl}}/api/skins/{{skinId}}", "host": ["{{baseUrl}}"], "path": ["api", "skins", "{{skinId}}"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Cases",
+      "item": [
+        {
+          "name": "Get all cases",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/cases", "host": ["{{baseUrl}}"], "path": ["api", "cases"] }
+          }
+        },
+        {
+          "name": "Create case (admin)",
+          "request": {
+            "method": "POST",
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}" }] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Weapon Case\",\n  \"price\": 100,\n  \"description\": \"Базовый кейс\",\n  \"items\": [\n    { \"skin\": \"{{skinId}}\", \"probability\": 100 }\n  ]\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/cases", "host": ["{{baseUrl}}"], "path": ["api", "cases"] },
+            "description": "Сумма probability всех items обязана быть равна 100 — иначе 400."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Статус 201', () => pm.response.to.have.status(201));", "pm.collectionVariables.set('caseId', pm.response.json()._id);"]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get case by id",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/cases/{{caseId}}", "host": ["{{baseUrl}}"], "path": ["api", "cases", "{{caseId}}"] }
+          }
+        },
+        {
+          "name": "Update case (admin)",
+          "request": {
+            "method": "PUT",
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}" }] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"price\": 150\n}" },
+            "url": { "raw": "{{baseUrl}}/api/cases/{{caseId}}", "host": ["{{baseUrl}}"], "path": ["api", "cases", "{{caseId}}"] }
+          }
+        },
+        {
+          "name": "Delete case (admin)",
+          "request": {
+            "method": "DELETE",
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}" }] },
+            "url": { "raw": "{{baseUrl}}/api/cases/{{caseId}}", "host": ["{{baseUrl}}"], "path": ["api", "cases", "{{caseId}}"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Inventory",
+      "item": [
+        {
+          "name": "Get my inventory",
+          "request": {
+            "method": "GET",
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}" }] },
+            "url": { "raw": "{{baseUrl}}/api/inventory", "host": ["{{baseUrl}}"], "path": ["api", "inventory"] },
+            "description": "Инвентарь текущего пользователя. Опциональный фильтр: ?status=owned или ?status=sold."
+          }
+        },
+        {
+          "name": "Get my inventory (owned only)",
+          "request": {
+            "method": "GET",
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}" }] },
+            "url": { "raw": "{{baseUrl}}/api/inventory?status=owned", "host": ["{{baseUrl}}"], "path": ["api", "inventory"], "query": [{ "key": "status", "value": "owned" }] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Wallet",
+      "item": [
+        {
+          "name": "Get wallet",
+          "request": {
+            "method": "GET",
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}" }] },
+            "url": { "raw": "{{baseUrl}}/api/wallet", "host": ["{{baseUrl}}"], "path": ["api", "wallet"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Uploads (Cloudinary)",
+      "description": "Загрузка картинок для скинов/кейсов в Cloudinary. Требуется переменная окружения CLOUDINARY_URL и роль admin.",
+      "item": [
+        {
+          "name": "Upload image (admin)",
+          "request": {
+            "method": "POST",
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}" }] },
+            "body": {
+              "mode": "formdata",
+              "formdata": [{ "key": "image", "type": "file", "src": null }]
+            },
+            "url": { "raw": "{{baseUrl}}/api/uploads", "host": ["{{baseUrl}}"], "path": ["api", "uploads"] },
+            "description": "Выберите файл в теле запроса (поле image). Ответ содержит url — его подставляйте в поле image скина/кейса. Сохраняет publicId в переменные."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Статус 201', () => pm.response.to.have.status(201));", "pm.collectionVariables.set('publicId', pm.response.json().publicId);"]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete image (admin)",
+          "request": {
+            "method": "DELETE",
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}" }] },
+            "url": { "raw": "{{baseUrl}}/api/uploads/{{publicId}}", "host": ["{{baseUrl}}"], "path": ["api", "uploads", "{{publicId}}"] },
+            "description": "publicId сохраняется после загрузки. В URL слеши экранируются (%2F) — Postman делает это автоматически из переменной."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Будущие маршруты (сейчас 501)",
+      "description": "Бизнес-логика открытия кейсов и продажи скинов будет реализована на следующем этапе.",
+      "item": [
+        {
+          "name": "Open case (будет: POST /api/cases/:id/open)",
+          "request": {
+            "method": "POST",
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}" }] },
+            "url": { "raw": "{{baseUrl}}/api/cases/{{caseId}}/open", "host": ["{{baseUrl}}"], "path": ["api", "cases", "{{caseId}}", "open"] },
+            "description": "Сейчас возвращает 501. План: списывает price кейса, выбирает скин по вероятностям, создаёт Inventory и Transaction."
+          }
+        },
+        {
+          "name": "Sell skin (будет: POST /api/inventory/:id/sell)",
+          "request": {
+            "method": "POST",
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}" }] },
+            "url": { "raw": "{{baseUrl}}/api/inventory/{{inventoryId}}/sell", "host": ["{{baseUrl}}"], "path": ["api", "inventory", "{{inventoryId}}", "sell"] },
+            "description": "Сейчас возвращает 501. План: зачисляет skinPrice на баланс, ставит status='sold', создаёт Transaction."
+          }
+        }
+      ]
+    }
+  ]
+}

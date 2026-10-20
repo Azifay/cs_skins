@@ -1,0 +1,35 @@
+{
+  "name": "steam",
+  "version": "1.0.0",
+  "description": "CS2 Skin Store API - Express + MongoDB + Mongoose",
+  "main": "src/server.js",
+  "scripts": {
+    "dev": "nodemon src/server.js",
+    "dev:local": "node scripts/dev-local.js",
+    "start": "node src/server.js",
+    "smoke": "node scripts/smoke-test.js"
+  },
+  "keywords": [
+    "cs2",
+    "skins",
+    "marketplace",
+    "express",
+    "mongodb"
+  ],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "cloudinary": "^2.11.0",
+    "dotenv": "^18.0.5",
+    "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.3",
+    "mongoose": "^9.11.0",
+    "multer": "^2.4.0"
+  },
+  "devDependencies": {
+    "mongodb-memory-server": "^11.3.0",
+    "nodemon": "^3.1.14"
+  }
+}
